@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -59,9 +60,13 @@ class Handler(BaseHTTPRequestHandler):
                     raise RuntimeError('RSS.app says this feed was deleted or invalid')
                 root = ET.fromstring(raw)
                 items = []
+                symbols = set()
                 for item in root.findall('.//item')[:10]:
-                    items.append({'title': item.findtext('title', ''), 'link': item.findtext('link', ''), 'date': item.findtext('pubDate', ''), 'description': item.findtext('description', '')})
-                self.send_json(200, {'ok': True, 'items': items, 'source': SOCIAL_FEED_URL})
+                    title = item.findtext('title', '')
+                    description = item.findtext('description', '')
+                    symbols.update(re.findall(r'\$([A-Z]{1,5}(?:\.[A-Z])?)\b', f'{title} {description}'))
+                    items.append({'title': title, 'link': item.findtext('link', ''), 'date': item.findtext('pubDate', ''), 'description': description})
+                self.send_json(200, {'ok': True, 'items': items, 'symbols': sorted(symbols), 'source': SOCIAL_FEED_URL})
             except Exception as error:
                 self.send_json(502, {'ok': False, 'source': SOCIAL_FEED_URL, 'error': f'RSS feed unavailable: {error}'})
             return
